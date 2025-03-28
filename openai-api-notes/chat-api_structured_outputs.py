@@ -39,5 +39,9 @@ completion = client.beta.chat.completions.parse(
     response_format=ChefNotes,
 )
 
-chef_steps = completion.choices[0].message.parsed
-print(chef_steps.model_dump_json(indent=4))
+chef_steps = completion.choices[0].message
+
+if (chef_steps.refusal):
+    print(chef_steps.refusal)
+else:
+    print(chef_steps.parsed)
