@@ -2,9 +2,6 @@
 # ----------------------------------------------------------------------------------------
 from dotenv import load_dotenv
 import os
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 load_dotenv()
 
 
@@ -13,6 +10,10 @@ load_dotenv()
 # ----------------------------------------------------------------------------------------
 import json
 from openai import OpenAI
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
 
 # Create an instance of OpenAI client
 # ----------------------------------------------------------------------------------------
