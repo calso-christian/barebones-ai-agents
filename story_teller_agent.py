@@ -1,8 +1,8 @@
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 from openai import OpenAI
 
-import os
+import os, json
 import logging
 from dotenv import load_dotenv
 from typing import Dict, List
@@ -109,12 +109,34 @@ def create_story_outline(extracted_theme_genre: str) -> StoryOutline:
     logger.info(f"Story Main Character: {result.main_character}")
     logger.info(f"Story Conflict: {result.conflict}")
 
-    return result
+    return json.dumps(result.model_dump())
 
 
+def story_chapters(outline: str) -> StoryChapters:
+    logger.debug('Generating Chapters from Outline ...')
 
-outline=story_details_extraction("A man wakes up to find his reflection "
+    completion = client.beta.chat.completions.parse(
+        model=model,
+        messages=[
+            {
+                "role":"system",
+                "content": "You're an expert story-teller. Create chapters from the given story outline. Generate 4-6 chapters"
+                "Respond a content with a string that is parsable to python dictionary"
+            },
+            {
+                "role":"user",
+                "content":outline
+            }
+        ],
+    )
+
+    content = completion.choices[0].message.content
+
+
+inputs=story_details_extraction("A man wakes up to find his reflection "
 "missing from every mirror—until he hears it whisper from behind him, 'Don't turn around.'"
 )
 
-create_story_outline(outline)
+outline=create_story_outline(inputs)
+
+story_chapters(outline)
