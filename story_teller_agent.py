@@ -26,8 +26,8 @@ model='gpt-4o'
 class StoryInput(BaseModel):
     # User Input Validation
 
-    genre: str = Field(min_length=3, max_length=500, description="The genre of the story (e.g., Fantasy, Scifi, Drama)")
-    theme: str = Field(min_length=3, max_length=500, description="The idea of the whole story")
+    genre: str = Field(description="The genre of the story (e.g., Fantasy, Scifi, Drama)")
+    theme: str = Field(description="The idea of the whole story")
     
 
 class StoryOutline(BaseModel):
@@ -47,11 +47,36 @@ class StoryChapters(BaseModel):
 
 class StoryChaptersParagraphs(BaseModel):
     paragraphs: List[str] = Field(description="List of detailed paragraphs for each chapter")
-    
+
     # openingParagraph: str = Field(description="Includes all chapter 1 of the story")
     # buildUpParagraph: str = Field(description="Includes chapter 2 and all the build of the story")
     # climaxParagraph: str = Field(description="Includes chapter 3, and climax of the story")
     # endingParagraph: str = Field(description="Includes ending of the story")
 
-   
+def story_details_extraction(user_input: str) -> StoryInput:
+    
+    logger.info("Starting story details extraction and analysis")
+    logger.debug(f"Input Text: {user_input}")
+
+    completion = client.beta.chat.completions.parse(
+        model=model,
+        messages=[
+            {
+                "role":"system",
+                "content": "You're an expert story-teller. Extract the Genre and Theme described from the text"
+            },
+            {
+                "role":"user",
+                "content":user_input
+            }
+        ],
+        response_format=StoryInput,
+    )
+
+    result = completion.choices[0].message.parsed
+
+    logger.info(f"Extraction Complete - Genre: {result.genre}")
+    logger.info(f"Extraction Complete - Theme: {result.theme}")
+
+    return result
 
