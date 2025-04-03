@@ -31,10 +31,10 @@ class StoryInput(BaseModel):
     
 
 class StoryOutline(BaseModel):
-    title: str = Field(min_length=5, max_length=100, description="Title of the Story")
-    setting: str = Field(min_length=10, max_length=500, description="When and where the story will take place")
-    main_character: str = Field(min_length=2, max_length=50, description="The protagonist of the Story")
-    conflict: str = Field(min_length=10, max_length=500, description="The challenge or the problem of the story")
+    title: str = Field(description="Title of the Story")
+    setting: str = Field(description="When and where the story will take place")
+    main_character: str = Field(description="The protagonist of the Story")
+    conflict: str = Field(description="The challenge or the problem of the story")
 
 class StoryChapters(BaseModel):
 
@@ -75,8 +75,46 @@ def story_details_extraction(user_input: str) -> StoryInput:
 
     result = completion.choices[0].message.parsed
 
+    #logger.info(F"Extraction Complete = Raw: {completion.choices[0].message}")
     logger.info(f"Extraction Complete - Genre: {result.genre}")
     logger.info(f"Extraction Complete - Theme: {result.theme}")
 
+    return f"Story Details - {result.genre}: {result.theme}"
+
+
+def create_story_outline(extracted_theme_genre: str) -> StoryOutline:
+    input=extracted_theme_genre
+
+    logger.info('Creating Story Outline ...')
+
+    completion = client.beta.chat.completions.parse(
+        model=model,
+        messages=[
+            {
+                "role":"system",
+                "content": "You're an expert story-teller. Extract the necessary info from the Given Genre and Theme"
+            },
+            {
+                "role":"user",
+                "content":input
+            }
+        ],
+        response_format=StoryOutline,
+    )
+
+    result = completion.choices[0].message.parsed
+
+    logger.info(f"Story Title: {result.title}")
+    logger.info(f"Story Setting: {result.setting}")
+    logger.info(f"Story Main Character: {result.main_character}")
+    logger.info(f"Story Conflict: {result.conflict}")
+
     return result
 
+
+
+outline=story_details_extraction("A man wakes up to find his reflection "
+"missing from every mirror—until he hears it whisper from behind him, 'Don't turn around.'"
+)
+
+create_story_outline(outline)
