@@ -38,12 +38,7 @@ class StoryOutline(BaseModel):
 
 class StoryChapters(BaseModel):
 
-    chapters: Dict[str, str] = Field(description="A dictionary of chapter summaries")
-
-    # chapter_1: str = Field(description="First Chapter of the story")
-    # chapter_2: str = Field(description="Second Chapter of the story")
-    # chapter_3: str = Field(description="Third Chapter Chapter of the story, includes climax")
-    # chapter_4: str = Field(description="Last Chapter of the story, includes ending of the story")
+    chapters: Dict[str, str] = Field(..., description="A dictionary of chapter summaries")
 
 class StoryChaptersParagraphs(BaseModel):
     paragraphs: List[str] = Field(description="List of detailed paragraphs for each chapter")
@@ -63,7 +58,8 @@ def story_details_extraction(user_input: str) -> StoryInput:
         messages=[
             {
                 "role":"system",
-                "content": "You're an expert story-teller. Extract the Genre and Theme described from the text"
+                "content": "You're an expert story-teller."
+                " Extract the Genre and Theme described from the text"
             },
             {
                 "role":"user",
@@ -92,7 +88,8 @@ def create_story_outline(extracted_theme_genre: str) -> StoryOutline:
         messages=[
             {
                 "role":"system",
-                "content": "You're an expert story-teller. Extract the necessary info from the Given Genre and Theme"
+                "content": "You're an expert story-teller. "
+                "Extract the necessary info from the Given Genre and Theme"
             },
             {
                 "role":"user",
@@ -112,25 +109,57 @@ def create_story_outline(extracted_theme_genre: str) -> StoryOutline:
     return json.dumps(result.model_dump())
 
 
-def story_chapters(outline: str) -> StoryChapters:
-    logger.debug('Generating Chapters from Outline ...')
+def create_chapter_summaries(story_outline: str) -> StoryChapters:
+    logger.info("Creating chapter summaries from story outline...")
 
-    completion = client.beta.chat.completions.parse(
-        model=model,
-        messages=[
-            {
-                "role":"system",
-                "content": "You're an expert story-teller. Create chapters from the given story outline. Generate 4-6 chapters"
-                "Respond a content with a string that is parsable to python dictionary"
-            },
-            {
-                "role":"user",
-                "content":outline
-            }
-        ],
-    )
+    try:
+        completion = client.chat.completions.create(
+            model=model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You're a professional story architect. Based on the given story outline, "
+                        "generate a set of chapter summaries. Return a JSON object like:\n"
+                        "{\n"
+                        "  \"chapters\": {\n"
+                        "    \"chapter_1\": \"Summary...\",\n"
+                        "    \"chapter_2\": \"Summary...\"\n"
+                        "  }\n"
+                        "}\n"
+                        "Only return the JSON object, no extra explanation."
+                    )
+                },
+                {
+                    "role": "user",
+                    "content": story_outline
+                }
+            ],
+            response_format={"type": "json_object"} 
+        )
 
-    content = completion.choices[0].message.content
+        raw_content = completion.choices[0].message.content
+        logger.debug(f"Raw response: {raw_content}")
+
+        parsed_json = json.loads(raw_content)
+
+        validated = StoryChapters(**parsed_json)
+
+        for chapter, summary in validated.chapters.items():
+            logger.info(f"{chapter}: {summary}")
+
+
+        return validated
+
+    except ValidationError as ve:
+        logger.error(f"Pydantic validation failed: {ve}")
+        raise
+
+    except Exception as e:
+        logger.error(f"Failed to generate chapter summaries: {e}")
+        raise
+
+
 
 
 inputs=story_details_extraction("A man wakes up to find his reflection "
@@ -139,4 +168,4 @@ inputs=story_details_extraction("A man wakes up to find his reflection "
 
 outline=create_story_outline(inputs)
 
-story_chapters(outline)
+create_chapter_summaries(outline)
