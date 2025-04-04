@@ -28,6 +28,7 @@ class StoryInput(BaseModel):
 
     genre: str = Field(description="The genre of the story (e.g., Fantasy, Scifi, Drama)")
     theme: str = Field(description="The idea of the whole story")
+    is_story_worthy: bool = Field()
     
 
 class StoryOutline(BaseModel):
@@ -41,7 +42,7 @@ class StoryChapters(BaseModel):
     chapters: Dict[str, str] = Field(..., description="A dictionary of chapter summaries")
 
 class StoryChaptersParagraphs(BaseModel):
-    paragraphs: List[str] = Field(description="List of detailed paragraphs for each chapter")
+    chapters: Dict[str, List[str]] = Field(..., description="A dictionary of chapter summaries")
 
     # openingParagraph: str = Field(description="Includes all chapter 1 of the story")
     # buildUpParagraph: str = Field(description="Includes chapter 2 and all the build of the story")
@@ -71,9 +72,10 @@ def story_details_extraction(user_input: str) -> StoryInput:
 
     result = completion.choices[0].message.parsed
 
-    #logger.info(F"Extraction Complete = Raw: {completion.choices[0].message}")
-    logger.info(f"Extraction Complete - Genre: {result.genre}")
-    logger.info(f"Extraction Complete - Theme: {result.theme}")
+    logger.info(F"Extraction Complete")
+    logger.info(f"Genre: {result.genre}")
+    logger.info(f"Theme: {result.theme}")
+
 
     return f"Story Details - {result.genre}: {result.theme}"
 
@@ -101,10 +103,13 @@ def create_story_outline(extracted_theme_genre: str) -> StoryOutline:
 
     result = completion.choices[0].message.parsed
 
+    logger.info(f"Outline Created")
     logger.info(f"Story Title: {result.title}")
     logger.info(f"Story Setting: {result.setting}")
     logger.info(f"Story Main Character: {result.main_character}")
     logger.info(f"Story Conflict: {result.conflict}")
+
+
 
     return json.dumps(result.model_dump())
 
@@ -145,8 +150,11 @@ def create_chapter_summaries(story_outline: str) -> StoryChapters:
 
         validated = StoryChapters(**parsed_json)
 
+
+        logger.info(f"Chapter Summaries Generated")
         for chapter, summary in validated.chapters.items():
             logger.info(f"{chapter}: {summary}")
+        
 
 
         return validated
@@ -160,7 +168,63 @@ def create_chapter_summaries(story_outline: str) -> StoryChapters:
         raise
 
 
+def paragraphs_per_chapter(chapters) -> StoryChaptersParagraphs:
+    logger.info("Analyzing chapters, creating paragraphs of the story")
 
+    try:
+        completion = client.chat.completions.create(
+            model=model,
+            messages=[
+                {
+                    "role":"system",
+                    "content":"You're a professional story architect. Based on the given chapter summaries, "
+                    "generate paragraphs to complete each chapters to build the whole story.\n"
+                    "Your response should be a JSON object that follows this structure:\n"
+                    "{\n"
+                    "  \"chapters\": {\n"
+                    "    \"chapter_1\": [\"Paragraph 1...\", \"Paragraph 2...\"],\n"
+                    "    \"chapter_2\": [\"Paragraph 1...\", \"Paragraph 2...\"]\n"
+                    "  }\n"
+                    "}\n"
+                    "Each chapter should contain a list of paragraphs that expand on the summary.\n"
+                    "Only return the JSON object in the specified format, without any extra explanation."
+                },
+                {
+                    "role":"user",
+                    "content":json.dumps(chapters.dict())
+                }
+            ],
+            response_format={"type": "json_object"} 
+        )
+
+        raw_content = completion.choices[0].message.content
+        logger.debug(f"Raw response: {raw_content}")
+
+        parsed_json = json.loads(raw_content)
+        validated = StoryChaptersParagraphs(**parsed_json)
+
+        logger.info(f"Story Completed")
+        # for chapter, paragraphs in validated.chapters.items():
+        #     logger.info(f"Chapter: {chapter}")
+        #     for idx, paragraph in enumerate(paragraphs, 1):
+        #         logger.info(f"  Paragraph {idx}: {paragraph}")
+
+        return validated
+
+    except ValidationError as ve:
+        logger.error(f"Pydantic validation failed: {ve}")
+        raise
+
+    except Exception as e:
+        logger.error(f"Failed to generate chapter summaries: {e}")
+        raise
+
+
+
+def agent_execution(user_input: str):
+    
+    
+    pass
 
 inputs=story_details_extraction("A man wakes up to find his reflection "
 "missing from every mirror—until he hears it whisper from behind him, 'Don't turn around.'"
@@ -168,4 +232,6 @@ inputs=story_details_extraction("A man wakes up to find his reflection "
 
 outline=create_story_outline(inputs)
 
-create_chapter_summaries(outline)
+chapters=create_chapter_summaries(outline)
+
+paragraphs_per_chapter(chapters)
